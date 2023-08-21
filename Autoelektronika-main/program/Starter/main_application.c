@@ -72,11 +72,14 @@ static QueueHandle_t seg7automatski_queue;
 static QueueHandle_t seg7d_queue;
 static QueueHandle_t serijska_ispis_queue;
 static QueueHandle_t serijska_ispis_duzina;
+static QueueHandle_t serijska_prijem_niz = NULL;
+static QueueHandle_t serijska_prijem_duzina = NULL;
+
 
 /* Strukture za redove */
 typedef struct serijska_ispis_podataka {//svi potrebni podaci za ispis na serijsku
 	uint8_t duzina_stringa;
-	uint8_t poruka[60];
+	uint8_t poruka[80];
 }serijska_ispis_podataka;
 
 typedef struct seg7_podaci { //svi potrebni podaci za ispis na 7-segmentni displej 
@@ -287,10 +290,11 @@ void main_demo(void)
 		seg7automatski_queue = xQueueCreate(2, sizeof(uint8_t));
 		seg7d_queue = xQueueCreate(2, sizeof(double[3]));
 		
-		serijska_ispis_queue = xQueueCreate(3, sizeof(uint8_t[60])); //red za skladistenje poruke za ispis
+		serijska_ispis_queue = xQueueCreate(3, sizeof(uint8_t[80])); //red za skladistenje poruke za ispis
 		serijska_ispis_duzina = xQueueCreate(3, sizeof(uint8_t)); //red za skladistenje duzine rijeci
 
-	
+		serijska_prijem_niz = xQueueCreate(3, sizeof(uint8_t[12])); //red za skladistenje primljene rijeci (komande)
+		serijska_prijem_duzina = xQueueCreate(3, sizeof(uint8_t)); //red za skladistenje duzine primljene rijeci
 
 
 	
@@ -349,15 +353,13 @@ static void led_bar_tsk(void* pvParameters)
 	uint8_t vent = 0;
 	//serijska_ispis_podataka* ispis_podataka;
 	uint8_t duzina_niza = 0;
-	uint8_t pomocni_niz[60] = { 0 };
+	uint8_t temp1[80] = { 0 };
 
 	while (1)
 	{
 		xSemaphoreTake(LED_INT_BinarySemaphore, portMAX_DELAY);
+		get_LED_BAR(0, &senzor_ocitavenje);
 
-		if ((get_LED_BAR(0, &senzor_ocitavenje)) != 0) {
-			printf("Greska prilikom ocitavanja");
-		}
 
 
 		if ((senzor_ocitavenje & 0x01) != 0) {
@@ -376,9 +378,9 @@ static void led_bar_tsk(void* pvParameters)
 
 				xSemaphoreTake(mutex_serijska, portMAX_DELAY);
 				//char poruka[] = "VENT:1";
-				strcpy(pomocni_niz, "VENT:1");
-				duzina_niza = sizeof(pomocni_niz) - 1;
-				if (xQueueSend(serijska_ispis_queue, &pomocni_niz, 0U) != pdTRUE) {
+				strcpy(temp1, "VENT:1");
+				duzina_niza = sizeof(temp1) - 1;
+				if (xQueueSend(serijska_ispis_queue, &temp1, 0U) != pdTRUE) {
 					printf("Neuspjesno slanje podataka u red\n");
 				}
 				if (xQueueSend(serijska_ispis_duzina, &duzina_niza, 0U) != pdTRUE) {
@@ -396,10 +398,10 @@ static void led_bar_tsk(void* pvParameters)
 				vent = 2;
 				xSemaphoreTake(mutex_serijska, portMAX_DELAY);
 				//char poruka[] = "VENT:2";
-				strcpy(pomocni_niz, "VENT:2");
-				duzina_niza = sizeof(pomocni_niz) - 1;
+				strcpy(temp1, "VENT:2");
+				duzina_niza = sizeof(temp1) - 1;
 
-				if (xQueueSend(serijska_ispis_queue, &pomocni_niz, 0U) != pdTRUE) {
+				if (xQueueSend(serijska_ispis_queue, &temp1, 0U) != pdTRUE) {
 					printf("Neuspjesno slanje podataka u red\n");
 				}
 				if (xQueueSend(serijska_ispis_duzina, &duzina_niza, 0U) != pdTRUE) {
@@ -408,7 +410,6 @@ static void led_bar_tsk(void* pvParameters)
 
 				send_serial_character(COM_CH2, 13);
 				xSemaphoreTake(semafor1, portMAX_DELAY);
-
 				xSemaphoreGive(mutex_serijska);
 			}
 
@@ -416,10 +417,10 @@ static void led_bar_tsk(void* pvParameters)
 				vent = 3;
 				xSemaphoreTake(mutex_serijska, portMAX_DELAY);
 				//char poruka[] = "VENT:3";
-				strcpy(pomocni_niz, "VENT:3");
-				duzina_niza = sizeof(pomocni_niz) - 1;
+				strcpy(temp1, "VENT:3");
+				duzina_niza = sizeof(temp1) - 1;
 
-				if (xQueueSend(serijska_ispis_queue, &pomocni_niz, 0U) != pdTRUE) {
+				if (xQueueSend(serijska_ispis_queue, &temp1, 0U) != pdTRUE) {
 					printf("Neuspjesno slanje podataka u red\n");
 				}
 				if (xQueueSend(serijska_ispis_duzina, &duzina_niza, 0U) != pdTRUE) {
@@ -436,10 +437,10 @@ static void led_bar_tsk(void* pvParameters)
 				vent = 4;
 				xSemaphoreTake(mutex_serijska, portMAX_DELAY);
 				//char poruka[] = "VENT:4";
-				strcpy(pomocni_niz, "VENT:4");
-				duzina_niza = sizeof(pomocni_niz) - 1;
+				strcpy(temp1, "VENT:4");
+				duzina_niza = sizeof(temp1) - 1;
 
-				if (xQueueSend(serijska_ispis_queue, &pomocni_niz, 0U) != pdTRUE) {
+				if (xQueueSend(serijska_ispis_queue, &temp1, 0U) != pdTRUE) {
 					printf("Neuspjesno slanje podataka u red\n");
 				}
 				if (xQueueSend(serijska_ispis_duzina, &duzina_niza, 0U) != pdTRUE) {
@@ -457,7 +458,7 @@ static void led_bar_tsk(void* pvParameters)
 			printf("vent: %u\n", (unsigned)vent);
 		}
 
-		if (senzor_ocitavenje & 0x02) {
+		if (senzor_ocitavenje & 0x02) { // min, max vrednost drugom ledovkom od dole
 			min_max_vr = 1;
 		}
 		else {
@@ -529,81 +530,102 @@ void Seg7_ispis_task(void* pvParameters) {
 	}
 }
 
-
+// Prvo sam probao preko Queue, pa nesto nije radilo kako treba, pa sam uradio preko promenljive temp2 i strcpy i strcat.
 void slanjeNaPC_tsk(void* pvParameters) {
 	uint8_t duzina_niza_ispis = 0;
+	uint8_t temp2[80] = { 0 };
 
 	while (1) {
 		xSemaphoreTake(stanje_PC, portMAX_DELAY);
 		xSemaphoreTake(mutex_serijska, portMAX_DELAY);
 
-		
-		// stanje
-		if (xQueueSend(serijska_ispis_queue, "Stanje: ", 0U) != pdTRUE) {
-			printf("Neuspesno slanje podataka u red\n");
 
-		}
+		// stanje
+		/*if (xQueueSend(serijska_ispis_queue, "Stanje: ", 0U) != pdTRUE) {
+			printf("Neuspesno slanje podataka u red\n");
+		
+		} */
+
+		strcpy(temp2, "Stanje: ");
 		duzina_niza_ispis = sizeof("Stanje: ") - 1;
 
 
-		}
-		if (automatski == 1) {
+	}
+	if (automatski == 1) {
 
-			if (xQueueSend(serijska_ispis_queue, "AUTOMATSKI", 0U) != pdTRUE) {
-				printf("Neuspesno slanje podataka u red\n");
-			}
-			duzina_niza_ispis += sizeof("AUTOMATSKI") - 1;
-		}
-		else {
-			if (xQueueSend(serijska_ispis_queue, "MANUELNO", 0U) != pdTRUE) {
-				printf("Neuspesno slanje podataka u red\n");
-			}
-			duzina_niza_ispis += sizeof("MANUELNO") - 1;
-		}
-
-		if (xQueueSend(serijska_ispis_queue, ", radi: ", 0U) != pdTRUE) {
-			printf("Neuspesno slanje podataka u red\n");
-		}
-		duzina_niza_ispis += sizeof(", radi: ") - 1;
-
-		// ukljuceno
-		if (ukljuceno == 1) {
-
-			if (xQueueSend(serijska_ispis_queue, "UKLJUCENO", 0U) != pdTRUE) {
-				printf("Neuspesno slanje podataka u red\n");
-			 }
-			duzina_niza_ispis += sizeof("UKLJUCENO") - 1;
-		}
-		else {
-			
-			if (xQueueSend(serijska_ispis_queue, "ISKLJUCENO", 0U) != pdTRUE) {
-				printf("Neuspesno slanje podataka u red\n");
-			}
-			duzina_niza_ispis += sizeof("ISKLJUCENO") - 1;
-		}
-		// temperatura
-		if (xQueueSend(serijska_ispis_queue, ", temp:", 0U) != pdTRUE) {
-			printf("Neuspesno slanje podataka u red\n");
-		}
-		duzina_niza_ispis += sizeof(", temp:") - 1;
-
-
-		char desetica = (unsigned)trenutna_temp / 10 + '0';
-		//send_serial_character(COM_CH2, desetica + '0');
-		char jedinica = (unsigned)trenutna_temp % 10 + '0';
-		//send_serial_character(COM_CH2, jedinica + '0');
-		/*if ((xQueueSend(serijska_ispis_queue, &temp_karakter, 0U)) != pdTRUE) {
+		/*if (xQueueSend(serijska_ispis_queue, "AUTOMATSKI", 0U) != pdTRUE) {
 			printf("Neuspesno slanje podataka u red\n");
 		} */
-		duzina_niza_ispis++;
-		xQueueSend(serijska_ispis_queue, &desetica, 0U);
-
-		xQueueSend(serijska_ispis_queue, &jedinica, 0U);
-
-		send_serial_character(COM_CH2, 13);
-
-		if (xQueueSend(serijska_ispis_duzina, &duzina_niza_ispis, 0U) != pdTRUE) {
+		strcat(temp2, "AUTOMATSKI");
+		duzina_niza_ispis += sizeof("AUTOMATSKI") - 1;
+	}
+	else {
+		/*if (xQueueSend(serijska_ispis_queue, "MANUELNO", 0U) != pdTRUE) {
 			printf("Neuspesno slanje podataka u red\n");
+		} */
+		strcat(temp2, "MANUELNO");
+		duzina_niza_ispis += sizeof("MANUELNO") - 1;
+	}
+
+	/*if (xQueueSend(serijska_ispis_queue, ", radi: ", 0U) != pdTRUE) {
+		printf("Neuspesno slanje podataka u red\n");
+	} */
+	strcat(temp2, "radi: ");
+	duzina_niza_ispis += sizeof(", radi: ") - 1;
+
+	// ukljuceno
+	if (ukljuceno == 1) {
+
+		/*if (xQueueSend(serijska_ispis_queue, "UKLJUCENO", 0U) != pdTRUE) {
+			printf("Neuspesno slanje podataka u red\n");
+		} */
+		strcat(temp2, "UKLJUCENO");
+		duzina_niza_ispis += sizeof("UKLJUCENO") - 1;
+	}
+	else {
+
+		/*if (xQueueSend(serijska_ispis_queue, "ISKLJUCENO", 0U) != pdTRUE) {
+			printf("Neuspesno slanje podataka u red\n");
+		}*/
+		strcat(temp2, "ISKLJUCENO");
+		duzina_niza_ispis += sizeof("ISKLJUCENO") - 1;
+	}
+	/*temperatura
+	if (xQueueSend(serijska_ispis_queue, ", temp:", 0U) != pdTRUE) {
+		printf("Neuspesno slanje podataka u red\n");
+	}
+	duzina_niza_ispis += sizeof(", temp:") - 1;
+
+
+	char desetica = (unsigned)trenutna_temp / 10 + '0';
+	//send_serial_character(COM_CH2, desetica + '0');
+	char jedinica = (unsigned)trenutna_temp % 10 + '0';
+	//send_serial_character(COM_CH2, jedinica + '0');
+	/*if ((xQueueSend(serijska_ispis_queue, &temp_karakter, 0U)) != pdTRUE) {
+		printf("Neuspesno slanje podataka u red\n");
+	}
+	duzina_niza_ispis++;
+	xQueueSend(serijska_ispis_queue, &desetica, 0U);
+
+	xQueueSend(serijska_ispis_queue, &jedinica, 0U);
+
+	send_serial_character(COM_CH2, 13);
+
+	*/
+
+	//temperatura
+	strcat(temp2, ", temp:");
+	duzina_niza_ispis += sizeof(", temp:") - 1;
+
+	temp2[duzina_niza_ispis++] = (unsigned)trenutna_temp / 10 + '0';
+	temp2[duzina_niza_ispis++] = (unsigned)trenutna_temp % 10 + '0';
+
+	if (xQueueSend(serijska_ispis_queue, &temp2, 0U) != pdTRUE) {
+		printf("Neuspesno slanje podataka u red\n");
+
+	}
+	if (xQueueSend(serijska_ispis_duzina, &duzina_niza_ispis, 0U) != pdTRUE) {
+		printf("Neuspesno slanje podataka u red\n");
 
 		// Zapocinjemo ispis
 		send_serial_character(COM_CH2, 13);
@@ -611,3 +633,4 @@ void slanjeNaPC_tsk(void* pvParameters) {
 		xSemaphoreTake(semafor1, portMAX_DELAY);
 		xSemaphoreGive(mutex_serijska);
 	}
+}
